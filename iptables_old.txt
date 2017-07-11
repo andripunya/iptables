@@ -1,0 +1,491 @@
+#!/bin/sh
+#clean up existing rules to ensure a clean slate.
+#flush existing rules
+iptables -t filter -F
+iptables -t nat -F
+iptables -t mangle -F
+
+#delete custom chains.
+iptables -X
+
+#set default policies.
+iptables -P INPUT DROP
+iptables -P FORWARD DROP 
+iptables -P OUTPUT DROP 
+
+# Create a LOGDROP chain to log and drop packets
+/sbin/iptables -N LOGDROP
+/sbin/iptables -A LOGDROP -j LOG --log-level crit --log-prefix "Drop Packet "
+/sbin/iptables -A LOGDROP -j DROP
+/sbin/iptables -N LOGACCEPT
+/sbin/iptables -A LOGACCEPT -j LOG --log-level crit --log-prefix "Allow Packet " 
+/sbin/iptables -A LOGACCEPT -j ACCEPT
+/sbin/iptables -N LOGINVDROP
+/sbin/iptables -A LOGINVDROP -j LOG --log-level crit --log-prefix "Invalid Packet "
+/sbin/iptables -A LOGINVDROP -j DROP 
+
+
+#==============================================================================================================#
+#INPUT rules.
+#don't accept packets from private reserved nets from the internet
+#iptables -A INPUT -i eth0 -s 192.168.0.0/255.255.0.0 -j DROP
+#iptables -A INPUT -i eth0 -s 172.16.0.0/255.250.0.0 -j DROP
+#iptables -A INPUT -i eth0 -s 10.0.0.0/255.0.0.0 -j DROP
+
+
+#accept CheckPoint
+iptables -A INPUT -i eth3 -p tcp --dport 4899 -j ACCEPT
+
+#accept all icmp packets
+iptables -A INPUT -p icmp -j ACCEPT
+
+#drop all invalid incoming packets.
+#iptables -A INPUT -m state --state INVALID -j LOGINVDROP
+
+#accept all input from the loopback device.
+iptables -A INPUT -i lo -j ACCEPT
+
+#FTP Reverse
+iptables -A INPUT -i eth9 -p tcp --sport 20 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp --sport 20 -j ACCEPT
+
+#Citic Access 
+iptables -A INPUT -i eth7 -p tcp --dport 32012 -j ACCEPT
+#Burp Access 
+iptables -A INPUT -i eth7 -p tcp --dport 32325 -j ACCEPT
+
+#allow only clients on the inside tftp access
+iptables -A INPUT -i eth1 -p udp --dport 69 -j ACCEPT
+iptables -A INPUT -i eth2 -p udp --dport 69 -j ACCEPT
+iptables -A INPUT -i eth3 -p udp --dport 69 -j ACCEPT
+iptables -A INPUT -i eth4 -p udp --dport 69 -j ACCEPT
+iptables -A INPUT -i eth5 -p udp --dport 69 -j ACCEPT
+iptables -A INPUT -i eth7 -p udp --dport 69 -j ACCEPT
+iptables -A INPUT -i eth8 -p udp --dport 69 -j ACCEPT
+iptables -A INPUT -i eth9 -p udp -s 203.128.248.64/26 --dport 69 -j ACCEPT
+
+#allow only clients on the inside ssh access
+iptables -A INPUT -i eth1 -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -i eth9 -p tcp --dport 16384 -j LOGACCEPT
+iptables -A INPUT -i eth3 -p tcp --dport 22222 -j ACCEPT
+iptables -A INPUT -i eth7 -p tcp --dport 22222 -j ACCEPT
+
+iptables -A INPUT -i eth6 -s 10.10.31.168/32 -j ACCEPT
+iptables -A INPUT -i eth6 -s 10.10.31.28/32 -j ACCEPT
+iptables -A INPUT -i eth6 -s 10.10.31.33/32 -j ACCEPT
+
+#backup smtp.mobile-8.net
+#iptables -A INPUT -i eth5 -p tcp --dport 25 -s 202.59.168.29 -j ACCEPT
+
+#allow client to access www (cacti)
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.11 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.21.5.89 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.12 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.28 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.28 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.165 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.169 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth7 -p tcp -s 10.21.1.0/24 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth7 -p tcp -s 10.0.0.0/24 --dport 80 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.128.0.0/14 --dport 80 -j ACCEPT
+
+#use for identd
+iptables -A INPUT -i eth3 -p tcp -s 10.21.5.0/24 --dport 113 -j ACCEPT
+
+#allow client to access vpn account 
+iptables -A INPUT -i eth6 -p tcp -s 10.10.31.12/32 --dport 1723 -j ACCEPT
+iptables -A INPUT -i eth7 -p tcp -s 10.144.0.0/16 --dport 1723 -j ACCEPT
+#iptables -A INPUT -i eth7 -p tcp -s 10.0.0.147/32 --dport 1723 -j ACCEPT
+iptables -A INPUT -i eth7 -p tcp -s 10.0.0.146/32 --dport 1723 -j ACCEPT
+iptables -A INPUT -i eth7 -p tcp -s 10.21.1.0/24 --dport 1723 -j ACCEPT
+
+#ACCESS PROXY BANDWIDTH MORATEL
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.240 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.36 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.174 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.46 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.11 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.157 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.25 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.26 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.23 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.68 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.17 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.70 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.34 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.51 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.12 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.197 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.170 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.37 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.57 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.29 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.28 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.213 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.131 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.211 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.169 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.21 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.148 --dport 3128 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.149 --dport 3128 -j ACCEPT
+
+#Access dari VPN box ini ke proxy
+iptables -A INPUT -s 192.168.43.0/24 -p tcp --dport 3129 -j ACCEPT
+
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.11 --dport 3306 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 5900 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 13000 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 13002 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 3899 -j ACCEPT
+
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 3129 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.12 --dport 3129 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.28 --dport 3129 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.169 --dport 3129 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.166 --dport 3129 -j ACCEPT
+
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.51 --dport 3129 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.12 --dport 3129 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.17 --dport 3129 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.28 --dport 3129 -j ACCEPT
+#iptables -A INPUT -i eth3 -p tcp -s 10.10.31.11 --dport 3129 -j ACCEPT
+
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.169 --dport 3130 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 33891 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp -s 10.10.31.33 --dport 33892 -j ACCEPT
+
+#samsung snet minta proxy
+iptables -A INPUT -i eth7 -p tcp -s 10.21.1.61 --dport 3129 -j ACCEPT
+iptables -A INPUT -i eth7 -p tcp -s 10.21.1.96 --dport 3129 -j ACCEPT
+iptables -A INPUT -i eth7 -p tcp -s 10.21.1.160 --dport 3129 -j ACCEPT
+#iptables -A INPUT -i eth7 -p tcp -s 10.0.0.147 --dport 3129 -j ACCEPT
+
+iptables -A INPUT -i eth9 -s 203.128.248.67 -j ACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 202.147.198.228/32 --dport 25 -j ACCEPT
+
+#THis is for samsung remote to vas system
+iptables -A INPUT -i eth3 -p tcp --dport 16384 -j ACCEPT
+
+#iptables -A INPUT -i eth9 -p tcp -s 221.148.23.66 --dport 16384 -j LOGACCEPT
+#iptables -A INPUT -i eth9 -p tcp -s 211.39.27.21 --dport 16384 -j LOGACCEPT
+#iptables -A INPUT -i eth9 -p tcp -s 211.39.23.207 --dport 16384 -j LOGACCEPT
+#iptables -A INPUT -i eth9 -p tcp -s 210.94.44.1 --dport 16384 -j LOGACCEPT
+#iptables -A INPUT -i eth9 -p tcp -s 211.39.23.207 --dport 16384 -j LOGACCEPT
+
+#SGRG-Telcoware Remote IP
+iptables -A INPUT -i eth9 -p tcp -s 222.106.248.64 --dport 16384 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 222.106.248.65 --dport 16384 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 222.106.248.66 --dport 16384 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 222.106.248.67 --dport 16384 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 222.106.248.122 --dport 16384 -j LOGACCEPT
+
+#Remote IP ????
+#iptables -A INPUT -i eth9 -p tcp -s 210.118.39.116 --dport 16384 -j LOGACCEPT
+#iptables -A INPUT -i eth9 -p tcp -s 211.232.57.251 --dport 16384 -j LOGACCEPT
+
+#SNET Meridien Remote IP
+#iptables -A INPUT -i eth9 -p tcp -s 202.149.73.2 --dport 16384 -j LOGACCEPT
+
+#SNET From tebet
+iptables -A INPUT -i eth9 -p tcp -s 125.161.207.205 --dport 16384 -j LOGACCEPT
+
+#SNET Seoul Korea Remote IP
+iptables -A INPUT -i eth9 -p tcp -s 211.189.156.230 --dport 16384 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 211.189.156.227 --dport 16384 -j LOGACCEPT
+
+##MOBILE8 REMOTE
+iptables -A INPUT -i eth9 -p tcp -s 203.128.249.0/24 --dport 16384 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 202.59.168.0/26 --dport 16384 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 202.147.198.0/24 --dport 16384 -j LOGACCEPT
+#iptables -A INPUT -i eth9 -p tcp -s 202.147.198.0/24 --dport 22 -j LOGACCEPT
+
+#HUAWEI REMOTE
+iptables -A INPUT -i eth9 -p tcp -s 219.133.0.3 --dport 22 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 210.21.230.2 --dport 22 -j LOGACCEPT
+iptables -A INPUT -i eth9 -p tcp -s 210.21.230.28 --dport 22 -j LOGACCEPT
+
+#Request from Soca for ftp to Public
+#iptables -A INPUT -i eth9 -p tcp --dport 21 -j ACCEPT
+iptables -A INPUT -i eth3 -p tcp --dport 21 -j ACCEPT
+
+#Testing Survey Online
+#iptables -A INPUT -i eth9 -p tcp --dport 6789 -j ACCEPT
+
+#allow incoming packets from connections we established
+iptables -A INPUT -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+#Backup Link Frame Relay 
+#iptables -A INPUT -i eth9 -p tcp --dport 16384 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 27000 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 25000 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 26000 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 8248 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 8249 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 21000 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 22000 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16605 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6605 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6606 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 18250 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 8250 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16626 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6626 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 18472 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 8472 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16619 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6619 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 32024 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6620 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16168 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6169 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6168 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16633 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6633 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6632 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16688 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6688 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16699 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6699 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16615 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6615 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16611 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6611 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6612 -j ACCEPT         
+#iptables -A INPUT -i eth9 -p tcp --dport 16655 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6655 -j ACCEPT
+#iptables -A INPUT -i eth9 -p tcp --dport 6656 -j ACCEPT
+
+
+#================================================================================================================#
+
+#FORWARD rules
+#don't forward packets to private reserved networks on the internet
+# these packets would have come from eth1, send an icmp error back (which is the correct behaviour for a router)
+#iptables -A FORWARD -o eth0 -d 192.168.0.0/255.255.0.0 -j REJECT --reject-with icmp-net-unreachable
+#iptables -A FORWARD -o eth0 -d 172.16.0.0/255.250.0.0 -j REJECT --reject-with icmp-net-unreachable
+#iptables -A FORWARD -o eth0 -d 10.0.0.0/255.0.0.0 -j REJECT --reject-with icmp-net-unreachable
+
+#drop all invalid forward packets.
+#iptables -A FORWARD -m state --state INVALID -j LOGINVDROP 
+
+#forward all icmp packets
+iptables -A FORWARD -p icmp -j ACCEPT
+
+
+#.......................................................................................#
+#BYPASS PACKET MOBILE DATA
+iptables -A POSTROUTING -t nat -s 10.128.0.0/14 -o eth6 -j MASQUERADE
+
+#DAFTARKAN IP SERVER YANG AKAN AKSES KE HANDSET / INTERNAL
+iptables -A FORWARD -p TCP -i eth0 -s 192.168.0.0/24 -d 10.128.0.0/16 -j ACCEPT
+iptables -A FORWARD -p UDP -i eth0 -s 192.168.0.0/24 -d 10.128.0.0/14 -j ACCEPT
+
+#TESTING ACCESS DARI PC ANDRI KE DNS
+iptables -A FORWARD -p TCP -i eth0 -s 192.168.10.223/32 -d 10.21.4.77/32 -j ACCEPT 
+iptables -A FORWARD -p TCP -i eth1 -s 10.21.4.77/32 -d 192.168.10.223/32 -j ACCEPT 
+#.......................................................................................#
+
+
+# accept NATed packets
+iptables -A FORWARD -m conntrack --ctstate DNAT,SNAT -j ACCEPT
+
+
+#FOR VPN TEST MORATEL
+#iptables -A INPUT -i eth3 -p 47 -j ACCEPT
+#iptables -A FORWARD -p icmp -j ACCEPT
+#iptables -A FORWARD -i 192.168.43.0/24 -o eth7 -m state --state NEW -j ACCEPT
+
+iptables -A FORWARD -s 192.168.43.0/24 -o eth3 -j ACCEPT
+iptables -A FORWARD -s 192.168.43.0/24 -o eth6 -j ACCEPT
+iptables -A FORWARD -s 192.168.43.0/24 -o eth7 -j ACCEPT
+iptables -A FORWARD -s 192.168.43.0/24 -o eth9 -j ACCEPT
+iptables -t nat -A PREROUTING -p tcp -s 192.168.43.0/24 --dport 80 -j DNAT --to 10.21.5.92:3129
+iptables -A POSTROUTING -t nat -s 192.168.43.0/24 -o eth3 -j MASQUERADE
+iptables -A POSTROUTING -t nat -s 192.168.43.0/24 -o eth6 -j MASQUERADE
+iptables -A POSTROUTING -t nat -s 192.168.43.0/24 -o eth7 -j MASQUERADE
+iptables -A POSTROUTING -t nat -s 192.168.43.0/24 -o eth9 -j MASQUERADE
+
+#this is for redirect to apolo - sama spt rinetd hanya transparent source ip (tidak di nat)
+#iptables -t nat -A PREROUTING -p tcp --dport 1723 -j DNAT --to 10.21.1.160:1723 
+#iptables -t nat -A PREROUTING -p 47 -j DNAT --to 10.21.1.160
+
+## INI PENGGANTI RERVICE RINETD UNRUK PROXY PAYMENT
+iptables -t nat -A POSTROUTING -d 202.59.168.99 -s 10.10.31.0/24 -p tcp --dport 3128 -j SNAT --to-source 10.21.5.92 
+iptables -t nat -A PREROUTING -s 10.10.31.0/24 -p tcp --dport 3130 -j DNAT --to 202.59.168.99:3128
+#iptables -A FORWARD -s 10.10.31.0/24 -d 202.59.168.99/32 -p tcp --dport 3128 -j ACCEPT
+
+#FOR IPSEC TO QUALCOMM
+#iptables -A FORWARD -s 10.21.6.66/32 -d 192.35.156.80/32 -o eth6 -j ACCEPT
+#iptables -A POSTROUTING -t nat -s 10.21.6.66/32 -d 192.35.156.80/32 -o eth6 -j MASQUERADE
+
+#simulate cp untuk software openwave
+iptables -A FORWARD -s 192.168.43.0/24 -d 192.168.10.0/24 -o eth0 -j ACCEPT
+iptables -A POSTROUTING -t nat -s 192.168.43.0/24 -d 192.168.10.0/24 -o eth0 -j MASQUERADE
+
+#CITRIX HUAWEI
+####
+#huawei request
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.50/32 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.50/32 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.50/32 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.50/32 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.50/32 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.50/32 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.50/32 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.50/32 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.50/32 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.50/32 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.0/21 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.0/21 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.0/21 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.0/21 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.0/21 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.0/21 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.0/21 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.0/21 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.155.151.0/21 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.155.151.0/21 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080#
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.134.130.31/32 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.134.130.31/32 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.134.130.31/32 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.134.130.31/32 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.134.130.31/32 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.134.130.31/32 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.134.130.31/32 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.134.130.31/32 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.134.130.31/32 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.134.130.31/32 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.67.7.254/32 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.67.7.254/32 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.67.7.254/32 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.67.7.254/32 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.67.7.254/32 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.67.7.254/32 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.67.7.254/32 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.67.7.254/32 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.67.7.254/32 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.67.7.254/32 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.149.73.183/32 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.149.73.183/32 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.149.73.183/32 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.149.73.183/32 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.149.73.183/32 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.149.73.183/32 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.149.73.183/32 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.149.73.183/32 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.149.73.183/32 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.149.73.183/32 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.133.0.1/32 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.133.0.1/32 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.133.0.1/32 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.133.0.1/32 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.133.0.1/32 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.133.0.1/32 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.133.0.1/32 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.133.0.1/32 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 219.133.0.1/32 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 219.133.0.1/32 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 221.6.3.75/32 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 221.6.3.75/32 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 221.6.3.75/32 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 221.6.3.75/32 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 221.6.3.75/32 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 221.6.3.75/32 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 221.6.3.75/32 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 221.6.3.75/32 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 221.6.3.75/32 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 221.6.3.75/32 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 203.128.249.0/24 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 203.128.249.0/24 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 203.128.249.0/24 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 203.128.249.0/24 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 203.128.249.0/24 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 203.128.249.0/24 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 203.128.249.0/24 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 203.128.249.0/24 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 203.128.249.0/24 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 203.128.249.0/24 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080
+
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.147.198.0/24 -p tcp --dport 2598 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.147.198.0/24 -p tcp --dport 2598 -j DNAT --to 10.76.180.252:2598
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.147.198.0/24 -p tcp --dport 80 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.147.198.0/24 -p tcp --dport 80 -j DNAT --to 10.76.180.252:80
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.147.198.0/24 -p tcp --dport 1494 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.147.198.0/24 -p tcp --dport 1494 -j DNAT --to 10.76.180.252:1494
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.147.198.0/24 -p tcp --dport 443 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.147.198.0/24 -p tcp --dport 443 -j DNAT --to 10.76.180.252:443
+iptables -t nat -A POSTROUTING -d 10.76.180.252 -s 202.147.198.0/24 -p tcp --dport 8080 -j SNAT --to-source 10.76.180.253
+iptables -t nat -A PREROUTING -s 202.147.198.0/24 -p tcp --dport 8080 -j DNAT --to 10.76.180.252:8080
+
+####
+
+iptables -A FORWARD -p tcp --tcp-flags SYN,RST SYN --jump TCPMSS --clamp-mss-to-pmtu
+iptables -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+
+
+#==============================================================================================#
+#OUTPUT rules
+#don't send packets to private reserved networks to the internet
+#iptables -A OUTPUT -o eth0 -d 192.168.0.0/255.255.0.0 -j DROP
+#iptables -A OUTPUT -o eth0 -d 172.16.0.0/255.250.0.0 -j DROP
+#iptables -A OUTPUT -o eth0 -d 10.0.0.0/255.0.0.0 -j DROP
+
+#drop all outgoing invalid packets.
+iptables -A OUTPUT -m state --state INVALID -j LOGDROP
+
+#allow all icmp packets
+iptables -A OUTPUT -p icmp -j ACCEPT
+
+#and loopback traffic
+iptables -A OUTPUT -o lo -j ACCEPT
+
+#allow packets of established connections
+iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+
+
+#======================================================================================================#
+
+#CAPTURE SEMUA PAKET YANG DI DROP SELAIN YANG TELAH DI ALLOW DI ATAS SEBELUMNYA
+/sbin/iptables -A INPUT -i eth0 -j LOGDROP
+/sbin/iptables -A INPUT -i eth1 -j LOGDROP
+/sbin/iptables -A INPUT -i eth3 -j LOGDROP
+/sbin/iptables -A INPUT -i eth4 -j LOGDROP
+/sbin/iptables -A INPUT -i eth5 -j LOGDROP
+/sbin/iptables -A INPUT -i eth6 -j LOGDROP
+/sbin/iptables -A INPUT -i eth7 -j LOGDROP
+/sbin/iptables -A INPUT -i eth8 -j LOGDROP
+/sbin/iptables -A INPUT -i eth9 -j LOGDROP
+
+/sbin/iptables -A FORWARD -i eth0 -j LOGDROP
+/sbin/iptables -A FORWARD -i eth1 -j LOGDROP
+/sbin/iptables -A FORWARD -i eth3 -j LOGDROP
+/sbin/iptables -A FORWARD -i eth4 -j LOGDROP
+/sbin/iptables -A FORWARD -i eth5 -j LOGDROP
+/sbin/iptables -A FORWARD -i eth6 -j LOGDROP
+/sbin/iptables -A FORWARD -i eth7 -j LOGDROP
+/sbin/iptables -A FORWARD -i eth8 -j LOGDROP
+/sbin/iptables -A FORWARD -i eth9 -j LOGDROP
+
+#ALLOW SEMUA PAKET YANG KELUAR DARI MESIN INI
+/sbin/iptables -A OUTPUT -o eth0 -j ACCEPT
+/sbin/iptables -A OUTPUT -o eth1 -j ACCEPT
+/sbin/iptables -A OUTPUT -o eth3 -j ACCEPT
+/sbin/iptables -A OUTPUT -o eth4 -j ACCEPT
+/sbin/iptables -A OUTPUT -o eth5 -j ACCEPT
+/sbin/iptables -A OUTPUT -o eth6 -j ACCEPT
+/sbin/iptables -A OUTPUT -o eth7 -j ACCEPT
+/sbin/iptables -A OUTPUT -o eth8 -j ACCEPT
+/sbin/iptables -A OUTPUT -o eth9 -j ACCEPT
+
